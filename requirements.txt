@@ -1,6 +1,8 @@
-pycaret
-streamlit
-catboost
-pandas
-numpy
-scikit-learn
+pycaret==3.3.2
+streamlit==1.43.0
+catboost==1.2.7
+lightgbm==4.3.0
+pandas==2.2.2
+numpy==1.26.4
+scikit-learn==1.4.2
+pmdarima==2.0.4

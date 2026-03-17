@@ -78,8 +78,8 @@ All Elo ratings use a pairwise comparison system adapted for multi-competitor ra
 
 | Phase | Algorithm | Unseen MAE | Unseen R² |
 |-------|-----------|------------|-----------|
-| Pre-Qualifying | CatBoost | 0.223 | 0.1744 |
-| Post-Qualifying | CatBoost + GBR Blend | 0.2142 | 0.2334 |
+| Pre-Qualifying | Random Forest + CatBoost Blend | 0.2222 | 0.1939 |
+| Post-Qualifying | CatBoost + LightGBM + Bayesian Ridge Blend | 0.2081 | 0.2489 |
 
 Models were trained using PyCaret with TimeSeriesSplit (10 folds) to respect temporal ordering of race data.
 
@@ -90,10 +90,10 @@ Models were trained using PyCaret with TimeSeriesSplit (10 folds) to respect tem
 ```
 ├── streamlit_indycar_predictor.py  # Main Streamlit app
 ├── models/
-│   ├── indycar_cat_prequaly_model_v1       # Pre-qualifying CatBoost model
-│   └── indycar_cat_gbr_postqualy_model_v1  # Post-qualifying CAT+GBR blend
+│   ├── indycar_rf_cat_prequaly_model_v1       # Pre-qualifying Cat+RF model
+│   └── indycar_cat_lgbm_br_postqualy_model_v1  # Post-qualifying Cat+lgbm+br blend
 ├── datasets/
-│   └── IndyCar_dataset_v14.csv             # Historical race data (2012–2025)
+│   └── IndyCar_dataset_v15.csv             # Historical race data (2012–2026)
 │   └── metrics_generator.ipynb         # Feature engineering notebook — run after each race
 ├── requirements.txt
 └── README.md
@@ -129,6 +129,6 @@ After each race:
 
 - **Python** — data processing and modeling
 - **PyCaret** — model training, blending, and tuning
-- **CatBoost / LightGBM / GBR** — base estimators
+- **CatBoost / LightGBM ** — base estimators
 - **Streamlit** — interactive web app
 - **Pandas / NumPy** — feature engineering

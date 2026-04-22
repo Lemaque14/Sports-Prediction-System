@@ -20,7 +20,7 @@ with col1:
     - Full field position predictions
     - Model Predictedresults vs Actual results tab
     """)
-    st.page_link("pages/indycar_page.py", label="indyCar Page", use_container_width=True)
+    st.page_link("pages/indycar_page.py", label="IndyCar Page", use_container_width=True)
 
 with col2:
     st.subheader("Liga MX")

@@ -11,8 +11,8 @@ st.title("Liga MX Clausura 2026")
 Base_dir = Path(__file__).resolve().parent.parent / "LigaMX"
 
 # Paths to models, datset and model prediction results
-MODEL = Base_dir/"models"/"LigaMX_model_v1"
-DATASET = Base_dir/"datasets"/"LigaMX_dataset_v2.csv"
+MODEL = Base_dir/"models"/"LigaMX_model_v2"
+DATASET = Base_dir/"datasets"/"LigaMX_dataset_v3.csv"
 PREDICTIONS = Base_dir/"predictions"/"model_compareLMX.xlsx"
 
 # Load data

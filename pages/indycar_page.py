@@ -15,7 +15,7 @@ Base_dir = Path(__file__).resolve().parent.parent / "IndyCar"
 # Paths to models, datset and model prediction results
 PRE_QUALY_MODEL = Base_dir/"models"/"indycar_rf_cat_prequaly_model_v2"
 POST_QUALY_MODEL = Base_dir/"models"/"indycar_cat_lgbm_br_postqualy_model_v2"
-DATASET = Base_dir/"datasets"/"IndyCar_dataset_v16.csv"
+DATASET = Base_dir/"datasets"/"IndyCar_dataset_v17.csv"
 PREDICTIONS = Base_dir/"predictions"/"model_compare.xlsx"
 
 # Load requested model
@@ -158,7 +158,7 @@ def populate_feature_row(driver_name, track_info, is_postqualy, position_start, 
     track_id = track_info['id']
     type_id = track_info["type_id"]
     is_new = track_info["is_new"]
-    engine_id = TEAMS_MAP[driver_info[team_id]]["engine_id"]
+    engine_id = TEAMS_MAP[team_id]["engine_id"]
 
     # Features baseline (Averages)
     features = {col: DATASET_AVGS.get(col, 0) for col in FEATURES}
@@ -369,6 +369,7 @@ with tab_sim:
 
         except Exception as e:
             st.error(f"Simulation error: {e}")
+            st.exception(e)
 
 # Tab 2 - Results Comparison
 with tab_results:

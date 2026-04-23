@@ -11,8 +11,8 @@ st.title("Liga MX Clausura 2026")
 Base_dir = Path(__file__).resolve().parent.parent / "LigaMX"
 
 # Paths to models, datset and model prediction results
-MODEL = Base_dir/"models"/"LigaMX_model_v2"
-DATASET = Base_dir/"datasets"/"LigaMX_dataset_v3.csv"
+MODEL = Base_dir/"models"/"LigaMX_model_v3"
+DATASET = Base_dir/"datasets"/"LigaMX_dataset_v4.csv"
 PREDICTIONS = Base_dir/"predictions"/"model_compareLMX.xlsx"
 
 # Load data
@@ -113,28 +113,28 @@ RESULT_MAP = {
     2  : "Draw"
 }
 JORNADA_MAP = {  
-    "Cuartos"   : 0,
-    "Final"     : 1,
-    "Jornada 1" : 2,
-    "Jornada 10": 3,
-    "Jornada 11": 4,
-    "Jornada 12": 5,
-    "Jornada 13": 6,
-    "Jornada 14": 7,
-    "Jornada 15": 8,
-    "Jornada 16": 9,
-    "Jornada 17": 10,
-    "Jornada 18": 11,
-    "Jornada 2" : 12,
-    "Jornada 3" : 13,
-    "Jornada 4" : 14,
-    "Jornada 5" : 15,
-    "Jornada 6" : 16,
-    "Jornada 7" : 17,
-    "Jornada 8" : 18,
-    "Jornada 9" : 19,
-    "Repechaje" : 20,
-    "Semis"     : 21,
+    "Jornada 1" : 0,
+    "Jornada 2" : 1,
+    "Jornada 3" : 2,
+    "Jornada 4" : 3,
+    "Jornada 5" : 4,
+    "Jornada 6" : 5,
+    "Jornada 7" : 6,
+    "Jornada 8" : 7,
+    "Jornada 9" : 8,
+    "Jornada 10": 9,
+    "Jornada 11": 10,
+    "Jornada 12": 11,
+    "Jornada 13": 12,
+    "Jornada 14": 13,
+    "Jornada 15": 14,
+    "Jornada 16": 15,
+    "Jornada 17": 16,
+    "Jornada 18": 17,
+    "Repechaje" : 18,
+    "Cuartos"   : 19,
+    "Semis"     : 20,
+    "Final"     : 21,
 }
 
 TIME_OPTIONS = {

@@ -56,6 +56,7 @@ def load_maps(path: str) -> dict:
 def load_results(path: str) -> pd.DataFrame:
     df = pd.read_excel(path, sheet_name="Results")
     df.columns = df.columns.str.strip()
+    df["Jornada"] = df["Jornada"].astype(str)
     return df
 
 # Helper function to create feature row
@@ -151,6 +152,10 @@ TIME_OPTIONS = {
     "10:00 PM": 22,
 }
 
+JORNADA_ORDER = (
+    [str(i) for i in range(1, 18)] + ["Cuartos", "Semis", "Final"])
+
+
 # UI
 st.page_link("sportssystem_homepage.py", label="Back to Homepage")
 tab_sim, tab_result = st.tabs(["Macth Simulator", "Results"])
@@ -242,15 +247,16 @@ with tab_result:
  
     df_results["Correct"] = df_results["Predicted Result"] == df_results["Actual Result"]
  
-    jornadas     = sorted(df_results["Jornada"].unique().tolist())
+    jornadas_in_data = df_results["Jornada"].unique().tolist()
+    jornadas = [j for j in JORNADA_ORDER if j in jornadas_in_data]
     selected_jornada = st.selectbox(
         "Filter by Jornada",
-        ["All"] + [str(j) for j in jornadas],
+        ["All"] + jornadas,
         key="results_jornada"
     )
  
     df_view = df_results.copy() if selected_jornada == "All" else \
-              df_results[df_results["Jornada"] == int(selected_jornada)].copy()
+              df_results[df_results["Jornada"] == selected_jornada].copy()
  
     st.divider()
  

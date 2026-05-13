@@ -39,8 +39,9 @@ def load_requested_model(model: str):
 @st.cache_data
 def load_feature_cols(data: str, is_postqualy: bool):
     df = pd.read_csv(data)
+    
     drop_cols = [
-    "DriverName", "PositionStart", "TeamName", "CarEngine", "EventName", "Track", "EventTrackType",
+    "DriverName", "TeamName", "CarEngine", "EventName", "Track", "EventTrackType",
     "EventDate", "EventDateFormatted", "EventID", "Era",
     "Status", "StatusID", "PositionFinish",
     "RacePoints", "TotalPoints", "Standings",

@@ -8,7 +8,19 @@ from pycaret.regression import load_model, predict_model
 
 
 st.set_page_config(page_title="IndyCar Prediction Page", layout="centered")
-st.title("2026 IndyCar Season")
+
+st.markdown("""
+    <style>
+    [data-testid="stSidebar"] {
+        display: none;
+    }
+    [data-testid="stSidebarCollapsedControl"] {
+        display: block;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+st.title("2026 IndyCar Season - INDY 500 EDITION!!")
 
 Base_dir = Path(__file__).resolve().parent.parent / "IndyCar"
 
@@ -27,9 +39,17 @@ def load_requested_model(model: str):
 @st.cache_data
 def load_feature_cols(data: str, is_postqualy: bool):
     df = pd.read_csv(data)
-    drop_cols = ["DriverName", "TeamName", "CarEngine", "EventName", "Track", "EventTrackType",
-                 "EventDate", "EventDateFormatted", "EventID", "Era", "Status", "StatusID",
-                 "PositionFinish", "NormalizedPositionFinish"]
+    drop_cols = [
+    "DriverName", "PositionStart", "TeamName", "CarEngine", "EventName", "Track", "EventTrackType",
+    "EventDate", "EventDateFormatted", "EventID", "Era",
+    "Status", "StatusID", "PositionFinish",
+    "RacePoints", "TotalPoints", "Standings",
+    "ElapsedTime", "TimeDiff",
+    "QualTime", "QualSpeed", "QualSegment",
+    "FirstPitLap", "LastPitLap", "AvgPitLap",
+    "LapsLed", "AvgRacePosition", "PosVariance", "BestPosition",
+    "NormalizedPositionFinish",
+    ]
 
     if not is_postqualy:
         drop_cols.append("PositionStart")
@@ -116,13 +136,27 @@ DRIVERS_MAP = {
     "Rinus VeeKay": {"id": 4614, "team_id": 16, "team_name": "Juncos Hollinger Racing", "rookie": False},
 }
 
+INDY500_DRIVERS_MAP = {
+    **DRIVERS_MAP,
+    "Jacob Abel": {"id": 4644, "team_id": 2, "team_name": "Abel Motorsports", "rookie": True},
+    "Ed Carpenter": {"id": 3620, "team_id": 15, "team_name": "Ed Carpenter Racing", "rookie": False},
+    "Helio Castroneves": {"id": 3622, "team_id": 19, "team_name": "Meyer Shank Racing", "rookie": False},
+    "Conor Daly": {"id": 4218, "team_id": 14, "team_name": "Dreyer & Reinbold Racing", "rookie": False},
+    "Jack Harvey": {"id": 4505, "team_id": 14, "team_name": "Dreyer & Reinbold Racing", "rookie": False},
+    "Katherine Legge": {"id": 4401, "team_id": 1, "team_name": "A.J. Foyt Enterprises", "rookie": False},
+    "Takuma Sato": {"id": 3811, "team_id": 24, "team_name": "Rahal Letterman Lanigan Racing", "rookie": False},
+    "Ryan Hunter-Reay": {"id": 3645, "team_id": 4, "team_name": "Arrow McLaren", "rookie": False},
+}
+
 # Teams Map- team_id: {name, engine, engine_id}
 TEAMS_MAP = {
     1: {"name": "A.J. Foyt Enterprises", "engine": "Chevrolet", "engine_id": 0},
+    2: {"name": "Abel Motorsports", "engine": "Chevrolet", "engine_id": 0},
     3: {"name": "Andretti Global", "engine": "Honda", "engine_id": 1},
     4: {"name": "Arrow McLaren", "engine": "Chevrolet", "engine_id": 0},
     9: {"name": "Chip Ganassi Racing", "engine": "Honda", "engine_id": 1},
     11: {"name": "Dale Coyne Racing", "engine": "Honda", "engine_id": 1},
+    14: {"name": "Dreyer & Reinbold Racing", "engine": "Chevrolet", "engine_id": 0},
     15: {"name": "Ed Carpenter Racing", "engine": "Chevrolet", "engine_id": 0},
     16: {"name": "Juncos Hollinger Racing", "engine": "Chevrolet", "engine_id": 0},
     19: {"name": "Meyer Shank Racing", "engine": "Honda", "engine_id": 1},
@@ -152,12 +186,13 @@ TRACKS_MAP ={
 }
 
 # Helper function to create feature row for each driver
-def populate_feature_row(driver_name, track_info, is_postqualy, position_start, FEATURES, DATASET_AVGS, STATS):
-    driver_info = DRIVERS_MAP[driver_name]
+def populate_feature_row(driver_name, track_info, is_postqualy, position_start, FEATURES, DATASET_AVGS, STATS, drivers_map, field_size):
+    driver_info = drivers_map[driver_name]
     team_id = driver_info["team_id"]
     track_id = track_info['id']
     type_id = track_info["type_id"]
     is_new = track_info["is_new"]
+    print(f"Looking up team_id: {team_id}, available: {list(TEAMS_MAP.keys())}")
     engine_id = TEAMS_MAP[team_id]["engine_id"]
 
     # Features baseline (Averages)
@@ -275,6 +310,9 @@ def populate_feature_row(driver_name, track_info, is_postqualy, position_start, 
     if "EraID" in FEATURES:
         features["EraID"] = 2
 
+    if "FieldSize" in FEATURES:
+        features["FieldSize"] = field_size
+
     return features
 
 # Helper function to Denormalize postions for visual purposes
@@ -330,6 +368,10 @@ with tab_sim:
     track_name_sim = st.selectbox("Track", list(TRACKS_MAP.keys()), key = "sim_track")
     track_info_sim = TRACKS_MAP[track_name_sim]
 
+    is_indy500 = track_name_sim == "Indianapolis Motor Speedway (Oval)"
+    drivers_map = INDY500_DRIVERS_MAP if is_indy500 else DRIVERS_MAP
+    field_size = 33 if is_indy500 else FIELD_SIZE
+
     if track_info_sim["is_new"]:
         st.warning(f"**{track_name_sim}** is a new track. Therefore, predictions will be based on Track Type metrics only.")
 
@@ -338,7 +380,7 @@ with tab_sim:
     if is_postqualy:
         st.markdown("**Enter Qualifying grid positions:**")
         cols = st.columns(3)
-        for i, driver, in enumerate(DRIVERS_MAP.keys()):
+        for i, driver, in enumerate(drivers_map.keys()):
             with cols[i % 3]:
                 grid_positions[driver] = st.number_input(
                     driver, min_value = 1, max_value = 33,
@@ -350,17 +392,25 @@ with tab_sim:
             all_rows = []
             driver_names = []
 
-            for driver in DRIVERS_MAP.keys():
+            for driver in drivers_map.keys():
                 position = grid_positions.get(driver) if is_postqualy else None
-                features = populate_feature_row(driver, track_info_sim, is_postqualy, position, FEATURES, DATASET_AVGS, STATS)
+                features = populate_feature_row(driver, track_info_sim, is_postqualy, position, FEATURES, DATASET_AVGS, STATS, drivers_map, field_size)
                 all_rows.append(features)
                 driver_names.append(driver)
+
+            #Feature row pop debug
+            #st.write("Sample feature row for first driver:")
+            #st.write(pd.DataFrame([all_rows[0]], columns=FEATURES))
+            #st.write("Last driver (Indy 500 only):")
+            #st.write(pd.DataFrame([all_rows[-1]], columns=FEATURES))
+            #st.stop()
+            
 
             input_df = pd.DataFrame(all_rows, columns = FEATURES)
 
             results = predict_model(model, data=input_df)
             results["Driver"] = driver_names
-            results["Raw Score"] = results["prediction_label"].apply(lambda x: round(x * (FIELD_SIZE - 1) + 1, 2))
+            results["Raw Score"] = results["prediction_label"].apply(lambda x: round(x * (field_size - 1) + 1, 2))
             results["Position"] = results["prediction_label"].rank(method="first").astype(int)
             results = results.sort_values("Position").reset_index(drop=True)
 
@@ -474,7 +524,7 @@ with tab_results:
         tooltip=["Driver:N", "ModelRank:Q", "MyRank:Q", "Diff:Q"]
     ).properties(height=380)
 
-    diag_df = pd.DataFrame({"x": [1,25], "y": [1,25]})
+    diag_df = pd.DataFrame({"x": [1,33], "y": [1,33]})
     diag = alt.Chart(diag_df).mark_line(color="gray", strokeDash=[4,4], opacity=.45).encode(x="x:Q", y="y:Q")
 
     st.altair_chart(graph + diag, use_container_width=True)

@@ -37,7 +37,7 @@ col1, col2 = st.columns(2)
 with col1:
     st.page_link("pages/indycar_page.py", label="IndyCar Page", use_container_width=True)
     st.caption("""
-    **INDY 500 Month - MAY UPDATE COMING SOON...**
+    **INDY 500 Month - MAY UPDATE**
     - Pre & Post Qualifying race simulator  
     - Full field position predictions
     - Model Predictedresults vs Actual results tab

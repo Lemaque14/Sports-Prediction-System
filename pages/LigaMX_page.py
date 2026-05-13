@@ -6,6 +6,18 @@ from pathlib import Path
 from pycaret.classification import load_model, predict_model
 
 st.set_page_config(page_title="Liga MX Prediction Page", layout="centered")
+
+st.markdown("""
+    <style>
+    [data-testid="stSidebar"] {
+        display: none;
+    }
+    [data-testid="stSidebarCollapsedControl"] {
+        display: block;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 st.title("Liga MX Clausura 2026")
 
 Base_dir = Path(__file__).resolve().parent.parent / "LigaMX"

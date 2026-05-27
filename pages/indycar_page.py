@@ -25,9 +25,9 @@ st.title("2026 IndyCar Season - INDY 500 EDITION!!")
 Base_dir = Path(__file__).resolve().parent.parent / "IndyCar"
 
 # Paths to models, datset and model prediction results
-PRE_QUALY_MODEL = Base_dir/"models"/"indycar_lgbm_cat_prequaly_model_v2"
-POST_QUALY_MODEL = Base_dir/"models"/"indycar_cat_lgbm_br_postqualy_model_v4"
-DATASET = Base_dir/"datasets"/"IndyCar_dataset_v19.csv"
+PRE_QUALY_MODEL = Base_dir/"models"/"indycar_lgbm_cat_prequaly_model_v3"
+POST_QUALY_MODEL = Base_dir/"models"/"indycar_lgbm_postqualy_model_v4"
+DATASET = Base_dir/"datasets"/"IndyCar_dataset_v22.csv"
 PREDICTIONS = Base_dir/"predictions"/"model_compare.xlsx"
 
 # Load requested model
@@ -44,30 +44,29 @@ def load_feature_cols(data: str, is_postqualy: bool):
     "DriverName", "TeamName", "CarEngine", "EventName", "Track", "EventTrackType",
     "EventDate", "EventDateFormatted", "EventID", "Era",
     "Status", "StatusID", "PositionFinish",
-    "RacePoints", "TotalPoints", "Standings",
-    "ElapsedTime", "TimeDiff",
-    "QualTime", "QualSpeed", "QualSegment",
-    "FirstPitLap", "LastPitLap", "AvgPitLap",
-    "LapsLed", "AvgRacePosition", "PosVariance", "BestPosition",
-    "NormalizedPositionFinish",
+    "TotalCautions", "TotalCautionLaps", "TotalLeadChanges",
+    "AvgRaceSpeed", "FastestLapSpeed",
+    "AvgStintLength", "StintVariance", "FirstStopLap", "FirstStopVSAvgFirstStop",
+    "PittedCautions", "PitStops", "PittedCautionPCT", "TotalPitStops",
+    "PitStrategy", #"PitStrategyID",
+    "BestRacePosition", "WorstRacePosition", "LapsLed", "Top5Laps", "Top10Laps",
+    "PositionVolatility", "position_lap1", "PositionsGainedLap1",
+    "PositionsGainedPits", "PositionsGainedCaution",
+    "BestLapSpeed", "LapConsistency", "PaceDeg", "AvgPaceVSLeadPace",
+    "AvgPitTime", "PitAvgTimeVSOverall",
+    "NormalizedPositionFinish"
     ]
 
     if not is_postqualy:
-        drop_cols.append("PositionStart")
+        drop_cols.extend(["PositionStart","StartVsField"])
 
-    feature_row = df.drop(columns=drop_cols, errors="ignore").columns.tolist()
+    feature_row = df.drop(columns=drop_cols).columns.tolist()
     return feature_row
 
 @st.cache_data
 def load_averages(data: str):
     df = pd.read_csv(data)
     return df.select_dtypes(include=[np.number]).mean().to_dict()
-
-@st.cache_data
-def load_field_size(data: str) -> int:
-    df = pd.read_csv(data)
-    df["EventDate"] = pd.to_datetime(df["EventDate"])
-    return int(df.sort_values(["EventDate", "EventID"])["FieldSize"].tail(1).values[0])
 
 @st.cache_data
 def load_stats(data: str) -> dict:
@@ -99,7 +98,12 @@ def load_stats(data: str) -> dict:
         # Engine Data
         "engine": df_sorted.groupby("EngineID", sort=False).tail(1).set_index("EngineID").to_dict("index"),
         "engine_track": df_sorted.groupby(["EngineID", "TrackID"], sort=False).tail(1).set_index(["EngineID", "TrackID"]).to_dict("index"),
-        "engine_tracktype": df_sorted.groupby(["EngineID", "EventTrackTypeID"], sort=False).tail(1).set_index(["EngineID", "EventTrackTypeID"]).to_dict("index")
+        "engine_tracktype": df_sorted.groupby(["EngineID", "EventTrackTypeID"], sort=False).tail(1).set_index(["EngineID", "EventTrackTypeID"]).to_dict("index"),
+
+        # Track Data
+        "track": df_sorted.groupby("TrackID", sort=False).tail(1).set_index("TrackID").to_dict("index"),
+        "track_tracktype": df_sorted.groupby(["TrackID", "EventTrackTypeID"], sort=False).tail(1).set_index(["TrackID", "EventTrackTypeID"]).to_dict("index")
+
     }
 
 @st.cache_data
@@ -167,7 +171,7 @@ TEAMS_MAP = {
 
 # Trakcs Map- name: {id, type, type_id, is_new(bool)}
 TRACKS_MAP ={
-"Streets of St. Petersburg": {"id": 21, "type": "Street", "type_id": 2, "is_new": False},
+    "Streets of St. Petersburg": {"id": 21, "type": "Street", "type_id": 2, "is_new": False},
     "Phoenix Raceway": {"id": 10, "type": "Oval", "type_id": 0, "is_new": False},
     "Streets of Arlington": {"id": 29,"type": "Street", "type_id": 2, "is_new": False},
     "Barber Motorsports Park": {"id": 1, "type": "Road", "type_id": 1, "is_new": False},
@@ -187,7 +191,7 @@ TRACKS_MAP ={
 }
 
 # Helper function to create feature row for each driver
-def populate_feature_row(driver_name, track_info, is_postqualy, position_start, FEATURES, DATASET_AVGS, STATS, drivers_map, field_size):
+def populate_feature_row(driver_name, track_info, is_postqualy, position_start, start_vs_field, FEATURES, DATASET_AVGS, STATS, drivers_map, field_size):
     driver_info = drivers_map[driver_name]
     team_id = driver_info["team_id"]
     track_id = track_info['id']
@@ -265,7 +269,7 @@ def populate_feature_row(driver_name, track_info, is_postqualy, position_start, 
                 features[col] = team_row[col]
     row = track_row or team_row
     if row:
-        for col in ["TTP", "TeamTElo"]:
+        for col in ["TTP", "TeamTElo", "TeamTrackAvgPitStops", "TeamTrackAvgPittedCautionPCT"]:
             if col in FEATURES and col in row:
                 features[col] = row[col]
 
@@ -298,6 +302,21 @@ def populate_feature_row(driver_name, track_info, is_postqualy, position_start, 
         features["EngineID"] = int(engine_id)
 
     # Populates Track features
+
+    track_row = STATS["track"].get(track_id, None)
+    tracktype_row = STATS["track_tracktype"].get((track_id, type_id), None)
+
+    if track_row:
+        for col in ["TrackAvgCautions", "TrackAvgCautionLaps", "TrackAvgSpeed", "TotalRaceLaps", "TrackLength", "FuelWindowEstimate"]:
+            if col in FEATURES and col in track_row:
+                features[col] = track_row[col]
+
+    row = tracktype_row or track_row
+    if row:
+        for col in ["TrackTypeAvgCautions", "TrackTypeAvgCautionLaps"]:
+            if col in FEATURES and col in row:
+                features[col] = row[col]
+
     if "TrackID" in FEATURES:
         features["TrackID"] = int(track_id) if track_id is not None else 0
 
@@ -307,6 +326,10 @@ def populate_feature_row(driver_name, track_info, is_postqualy, position_start, 
     if is_postqualy and position_start is not None:
         if "PositionStart" in FEATURES:
             features["PositionStart"] = int(position_start)
+
+    if is_postqualy and start_vs_field is not None:
+        if "StartVsField" in FEATURES:
+            features["StartVsField"] = float(start_vs_field)
 
     if "EraID" in FEATURES:
         features["EraID"] = 2
@@ -360,7 +383,6 @@ with tab_sim:
     model = load_requested_model(str(model_path))
     FEATURES = load_feature_cols(str(DATASET), is_postqualy)
     DATASET_AVGS = load_averages(str(DATASET))
-    FIELD_SIZE = load_field_size(str(DATASET))
     STATS = load_stats(str(DATASET))
 
     st.subheader("Race Simulator")
@@ -371,7 +393,7 @@ with tab_sim:
 
     is_indy500 = track_name_sim == "Indianapolis Motor Speedway (Oval)"
     drivers_map = INDY500_DRIVERS_MAP if is_indy500 else DRIVERS_MAP
-    field_size = 33 if is_indy500 else FIELD_SIZE
+    field_size = 33 if is_indy500 else 25
 
     if track_info_sim["is_new"]:
         st.warning(f"**{track_name_sim}** is a new track. Therefore, predictions will be based on Track Type metrics only.")
@@ -395,14 +417,17 @@ with tab_sim:
 
             for driver in drivers_map.keys():
                 position = grid_positions.get(driver) if is_postqualy else None
-                features = populate_feature_row(driver, track_info_sim, is_postqualy, position, FEATURES, DATASET_AVGS, STATS, drivers_map, field_size)
+                start_field = float(position / field_size) if is_postqualy else None
+                features = populate_feature_row(driver, track_info_sim, is_postqualy, position, start_field, FEATURES, DATASET_AVGS, STATS, drivers_map, field_size)
                 all_rows.append(features)
                 driver_names.append(driver)
 
-            #Feature row pop debug
+            # Feature row pop debug
             #st.write("Sample feature row for first driver:")
             #st.write(pd.DataFrame([all_rows[0]], columns=FEATURES))
-            #st.write("Last driver (Indy 500 only):")
+            #st.write("Sample feature row for rookie driver:")
+            #st.write(pd.DataFrame([all_rows[1]], columns=FEATURES))
+            #st.write("Last driver:")
             #st.write(pd.DataFrame([all_rows[-1]], columns=FEATURES))
             #st.stop()
             

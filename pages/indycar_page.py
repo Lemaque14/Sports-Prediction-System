@@ -20,7 +20,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("2026 IndyCar Season - INDY 500 EDITION!!")
+st.title("IndyCar 2026 Season")
 
 Base_dir = Path(__file__).resolve().parent.parent / "IndyCar"
 
@@ -550,7 +550,7 @@ with tab_results:
         tooltip=["Driver:N", "ModelRank:Q", "MyRank:Q", "Diff:Q"]
     ).properties(height=380)
 
-    diag_df = pd.DataFrame({"x": [1,33], "y": [1,33]})
+    diag_df = pd.DataFrame({"x": [1,25], "y": [1,25]})
     diag = alt.Chart(diag_df).mark_line(color="gray", strokeDash=[4,4], opacity=.45).encode(x="x:Q", y="y:Q")
 
     st.altair_chart(graph + diag, use_container_width=True)

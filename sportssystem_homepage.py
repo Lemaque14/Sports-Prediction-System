@@ -37,10 +37,10 @@ col1, col2 = st.columns(2)
 with col1:
     st.page_link("pages/indycar_page.py", label="IndyCar Page", use_container_width=True)
     st.caption("""
-    **INDY 500 Month - MAY UPDATE**
+    **IndyCar 2026 Season**
     - Pre & Post Qualifying race simulator  
     - Full field position predictions
-    - Model Predictedresults vs Actual results tab
+    - Model Predicted results vs Actual results tab
     """)
 
 
@@ -50,7 +50,7 @@ with col2:
     **Liga MX Clausura 2026**
     - Match result prediction (W/L/D)
     - Win, Loss, Draw probablilities
-    -Model Predictedresults vs Actual results tab
+    -Model Predicted results vs Actual results tab
     """)
 
 

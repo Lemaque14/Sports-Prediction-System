@@ -27,7 +27,7 @@ Base_dir = Path(__file__).resolve().parent.parent / "IndyCar"
 # Paths to models, datset and model prediction results
 PRE_QUALY_MODEL = Base_dir/"models"/"indycar_lgbm_cat_prequaly_model_v3"
 POST_QUALY_MODEL = Base_dir/"models"/"indycar_lgbm_postqualy_model_v4"
-DATASET = Base_dir/"datasets"/"IndyCar_dataset_v22.csv"
+DATASET = Base_dir/"datasets"/"IndyCar_dataset_v24.csv"
 PREDICTIONS = Base_dir/"predictions"/"model_compare.xlsx"
 
 # Load requested model
@@ -184,8 +184,8 @@ TRACKS_MAP ={
     "Mid-Ohio Sports Car Course": {"id": 6, "type": "Road", "type_id": 1, "is_new": False},
     "Nashville Superspeedway": {"id": 8, "type": "Oval", "type_id": 0, "is_new": False},
     "Portland International Raceway": {"id": 12, "type": "Road", "type_id": 1, "is_new": False},
-    "Streets of Markham": {"id": None,"type": "Street", "type_id": 2, "is_new": True},
-    "Streets of Washington": {"id": None,"type": "Street", "type_id": 2, "is_new": True},
+    "Streets of Markham": {"id": 30,"type": "Street", "type_id": 2, "is_new": False},
+    "Streets of Washington": {"id": 31,"type": "Street", "type_id": 2, "is_new": False},
     "WeatherTech Raceway Laguna Seca": {"id": 27, "type": "Road", "type_id": 1, "is_new": False},
     "Milwaukee Mile": {"id": 7, "type": "Oval", "type_id": 0, "is_new": False},
 }

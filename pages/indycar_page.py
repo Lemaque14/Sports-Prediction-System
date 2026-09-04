@@ -27,7 +27,7 @@ Base_dir = Path(__file__).resolve().parent.parent / "IndyCar"
 # Paths to models, datset and model prediction results
 PRE_QUALY_MODEL = Base_dir/"models"/"indycar_lgbm_cat_prequaly_model_v3"
 POST_QUALY_MODEL = Base_dir/"models"/"indycar_lgbm_postqualy_model_v4"
-DATASET = Base_dir/"datasets"/"IndyCar_dataset_v24.csv"
+DATASET = Base_dir/"datasets"/"IndyCar_dataset_v25.csv"
 PREDICTIONS = Base_dir/"predictions"/"model_compare.xlsx"
 
 # Load requested model

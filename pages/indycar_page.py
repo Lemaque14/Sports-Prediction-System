@@ -6,6 +6,7 @@ from datetime import date
 from pathlib import Path
 from pycaret.regression import load_model, predict_model
 
+from features.indycar import build_current_state
 
 st.set_page_config(page_title="IndyCar Prediction Page", layout="centered")
 
@@ -71,6 +72,12 @@ def load_averages(data: str):
 @st.cache_data
 def load_stats(data: str) -> dict:
     df =pd.read_csv(data)
+
+    # Driver, team, engine and track features as they stand after the latest race.
+    # Each dataset row holds the values from before that race, so a driver's last
+    # row is one race behind.
+    stats = build_current_state(df)
+
     df["EventDate"] = pd.to_datetime(df["EventDate"])
     for col in ["DriverID", "TeamID", "EngineID", "TrackID", "EventTrackTypeID"]:
         if col in df.columns:
@@ -78,33 +85,14 @@ def load_stats(data: str) -> dict:
     df_sorted = df.sort_values(["EventDate", "EventID"])
     df_rookies = df_sorted[df_sorted["Rookie"] == 1]
 
-    return {
-        # Driver Data
-        "driver" : df_sorted.groupby("DriverID", sort=False).tail(1).set_index("DriverID").to_dict("index"),
-        "driver_track": df_sorted.groupby(["DriverID", "TrackID"], sort=False).tail(1).set_index(["DriverID", "TrackID"]).to_dict("index"),
-        "driver_tracktype": df_sorted.groupby(["DriverID", "EventTrackTypeID"], sort=False).tail(1).set_index(["DriverID", "EventTrackTypeID"]).to_dict("index"),
-
-        # Rookie Data
+    # Rookie Data: stand-in values for drivers with no races in the dataset yet
+    stats.update({
         "rookie_avgs": df_rookies.select_dtypes(include=[np.number]).mean().to_dict(),
         "rookie_team": df_rookies.groupby("TeamID", sort=False).tail(1).set_index("TeamID").to_dict("index"),
         "rookie_team_track": df_rookies.groupby(["TeamID", "TrackID"], sort=False).tail(1).set_index(["TeamID", "TrackID"]).to_dict("index"),
         "rookie_team_tracktype": df_rookies.groupby(["TeamID", "EventTrackTypeID"], sort=False).tail(1).set_index(["TeamID", "EventTrackTypeID"]).to_dict("index"),
-
-        # Teams Data
-        "team": df_sorted.groupby("TeamID", sort=False).tail(1).set_index("TeamID").to_dict("index"),
-        "team_track": df_sorted.groupby(["TeamID", "TrackID"], sort=False).tail(1).set_index(["TeamID", "TrackID"]).to_dict("index"),
-        "team_tracktype": df_sorted.groupby(["TeamID", "EventTrackTypeID"], sort=False).tail(1).set_index(["TeamID", "EventTrackTypeID"]).to_dict("index"),
-
-        # Engine Data
-        "engine": df_sorted.groupby("EngineID", sort=False).tail(1).set_index("EngineID").to_dict("index"),
-        "engine_track": df_sorted.groupby(["EngineID", "TrackID"], sort=False).tail(1).set_index(["EngineID", "TrackID"]).to_dict("index"),
-        "engine_tracktype": df_sorted.groupby(["EngineID", "EventTrackTypeID"], sort=False).tail(1).set_index(["EngineID", "EventTrackTypeID"]).to_dict("index"),
-
-        # Track Data
-        "track": df_sorted.groupby("TrackID", sort=False).tail(1).set_index("TrackID").to_dict("index"),
-        "track_tracktype": df_sorted.groupby(["TrackID", "EventTrackTypeID"], sort=False).tail(1).set_index(["TrackID", "EventTrackTypeID"]).to_dict("index")
-
-    }
+    })
+    return stats
 
 @st.cache_data
 def load_predictions(filepath: str, sheet: str) -> pd.DataFrame:
@@ -113,6 +101,8 @@ def load_predictions(filepath: str, sheet: str) -> pd.DataFrame:
     return df
 
 # Drivers Map- name: {id, team_id, team_name, rookie(bool)}
+# "rookie" is the official rookie status this season and is passed to the model as-is.
+# Whether a driver's own history is used depends only on having races in the dataset.
 DRIVERS_MAP = {
     "Marcus Armstrong": {"id": 4948, "team_id": 19, "team_name": "Meyer Shank Racing", "rookie": False},
     "Caio Collet": {"id": 4983, "team_id": 1, "team_name": "A.J. Foyt Enterprises", "rookie": True},
@@ -206,8 +196,9 @@ def populate_feature_row(driver_name, track_info, is_postqualy, position_start, 
     # Rookie indicator
     features["Rookie"] = int(driver_info["rookie"])
 
-    # Populates Driver specific features
-    if driver_info["id"] and not driver_info["rookie"]:
+    # Populates Driver specific features from the driver's own races when there are any,
+    # rookies included (a rookie's 10th race should use their first 9, as in training)
+    if driver_info["id"] in STATS["driver"]:
         driver_row = STATS["driver"].get(driver_info["id"], None)
         track_row = STATS["driver_track"].get((driver_info["id"], track_id), None) if not is_new else None
         tracktype_row = STATS["driver_tracktype"].get((driver_info["id"], type_id), None)
@@ -229,11 +220,8 @@ def populate_feature_row(driver_name, track_info, is_postqualy, position_start, 
                 if col in FEATURES and col in row:
                     features[col] = row[col]
 
-        if "DriverID" in FEATURES:
-            features["DriverID"] = int(driver_info["id"])
-
     else:
-        # Rookies
+        # Drivers with no races in the dataset yet: team's past rookies as a stand-in
         driver_row = STATS["rookie_avgs"]
         track_row = STATS["rookie_team_track"].get((team_id, track_id), None) if not is_new else None
         tracktype_row = STATS["rookie_team_tracktype"].get((team_id, type_id), None)
@@ -256,22 +244,29 @@ def populate_feature_row(driver_name, track_info, is_postqualy, position_start, 
                 if col in FEATURES and col in row:
                     features[col] = row[col]
 
-        if "DriverID" in FEATURES:
-            features["DriverID"] = int(STATS["rookie_avgs"].get("DriverID", 0))
+    # The model was trained with each driver's real ID, rookies included
+    if "DriverID" in FEATURES:
+        features["DriverID"] = int(driver_info["id"])
 
     # Populates Team specific features
     team_row = STATS["team"].get(team_id, None)
     track_row = STATS["team_track"].get((team_id, track_id), None) if not is_new else None
-        
+    tracktype_row = STATS["team_tracktype"].get((team_id, type_id), None)
+
     if team_row:
         for col in ["TRP", "TeamDNFRate", "TeamElo", "TeamRitmo"]:
             if col in FEATURES and col in team_row:
                 features[col] = team_row[col]
     row = track_row or team_row
     if row:
-        for col in ["TTP", "TeamTElo", "TeamTrackAvgPitStops", "TeamTrackAvgPittedCautionPCT"]:
+        for col in ["TeamTElo", "TeamTrackAvgPitStops", "TeamTrackAvgPittedCautionPCT"]:
             if col in FEATURES and col in row:
                 features[col] = row[col]
+
+    # TTP is the team's average at this track type
+    row = tracktype_row or team_row
+    if row and "TTP" in FEATURES and "TTP" in row:
+        features["TTP"] = row["TTP"]
 
     if "TeamID" in FEATURES:
         features["TeamID"] = int(team_id)
@@ -304,10 +299,10 @@ def populate_feature_row(driver_name, track_info, is_postqualy, position_start, 
     # Populates Track features
 
     track_row = STATS["track"].get(track_id, None)
-    tracktype_row = STATS["track_tracktype"].get((track_id, type_id), None)
+    tracktype_row = STATS["tracktype"].get(type_id, None)
 
     if track_row:
-        for col in ["TrackAvgCautions", "TrackAvgCautionLaps", "TrackAvgSpeed", "TotalRaceLaps", "TrackLength", "FuelWindowEstimate"]:
+        for col in ["TrackAvgCautions", "TrackAvgCautionLaps", "TrackAvgSpeed", "TrackAvgPitStops", "TotalRaceLaps", "TrackLength", "FuelWindowEstimate"]:
             if col in FEATURES and col in track_row:
                 features[col] = track_row[col]
 

@@ -5,6 +5,8 @@ import streamlit as st
 from pathlib import Path
 from pycaret.classification import load_model, predict_model
 
+from features.ligamx import build_current_state
+
 st.set_page_config(page_title="Liga MX Prediction Page", layout="centered")
 
 st.markdown("""
@@ -24,7 +26,7 @@ Base_dir = Path(__file__).resolve().parent.parent / "LigaMX"
 
 # Paths to models, datset and model prediction results
 MODEL = Base_dir/"models"/"LigaMX_model_v3"
-DATASET = Base_dir/"datasets"/"LigaMX_dataset_v4.csv"
+DATASET = Base_dir/"datasets"/"LigaMX_dataset_v6.csv"
 PREDICTIONS = Base_dir/"predictions"/"model_compareLMX.xlsx"
 
 # Load data
@@ -40,20 +42,17 @@ def load_data(path: str) -> pd.DataFrame:
 
 @st.cache_data
 def load_stats(path: str) -> dict:
-    df = pd.read_csv(path)
-    df["Date"] = pd.to_datetime(df["Date"])
-    df_sorted = df.sort_values("Date")
-
-    team_stats = df_sorted.groupby("TeamID").last().to_dict("index")
-    h2h_stats = df_sorted.groupby(["TeamID", "OpponentID"]).last().to_dict("index")
-
-    return {"team": team_stats, "h2h": h2h_stats}
+    # Each dataset row holds a team's stats from before that match, so the last
+    # row is one match behind. Replay the history to include the latest match.
+    return build_current_state(pd.read_csv(path))
 
 @st.cache_data
 def load_maps(path: str) -> dict:
     df = pd.read_csv(path)
     team_map = dict(zip(df["Equipo"], df["TeamID"]))
-    ref_map = dict(zip(df["Referee"].dropna(), df["RefereeID"].dropna()))
+    # Drop rows without a referee before pairing names with IDs, so the two stay aligned
+    refs = df.dropna(subset=["Referee"])
+    ref_map = dict(zip(refs["Referee"], refs["RefereeID"]))
     torneo_map = dict(zip(df["Torneo"], df["TorneoID"]))
     temporada_map = dict(zip(df["Temporada"], df["TemporadaID"]))
 

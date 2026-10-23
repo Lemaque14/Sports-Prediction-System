@@ -28,7 +28,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("Sports Prediction System")
-st.markdown("Machine Learning models that predict IndyCar Driver race Resutls, Liga MX Team Match Results Probabilities and soon other sports")
+st.markdown("Machine Learning models that predict IndyCar Driver race Results, Liga MX Team Match Results Probabilities, UFC round-by-round fight outcomes and soon other sports")
 
 st.divider()
 
@@ -53,11 +53,21 @@ with col2:
     -Model Predicted results vs Actual results tab
     """)
 
+col_ufc, _ = st.columns(2)
+with col_ufc:
+    st.page_link("pages/UFC_page.py", label="UFC Page", use_container_width=True)
+    st.caption("""
+    **UFC Men's Divisions**
+    - Each fighter's chance to win in every round or by decision
+    - Tale of the tape for any matchup
+    - Model vs actual results for every fight since 2025
+    """)
+
 
 st.divider()
 
 st.markdown("#### Coming Soon")
-col3, col4, col5, col6, col7 = st.columns(5)
+col3, col4, col5, col7 = st.columns(4)
 with col3:
     st.markdown("**Formula 1**")
     st.caption("Driver Race Position Prediction & Results tab")
@@ -69,10 +79,6 @@ with col4:
 with col5:
     st.markdown("**NBA**")
     st.caption("Match Result Prediction & Results tab")
-
-with col6:
-    st.markdown("**UFC**")
-    st.caption("Fight Result Prediction & Results tab")
 
 with col7:
     st.markdown("**NFL**")

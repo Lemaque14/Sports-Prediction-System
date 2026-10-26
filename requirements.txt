@@ -9,3 +9,4 @@ pmdarima==2.0.4
 openpyxl
 altair
 xgboost
+pyarrow==19.0.1

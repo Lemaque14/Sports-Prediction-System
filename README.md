@@ -125,6 +125,33 @@ After each race:
 
 ---
 
+## UFC Round-by-Round Predictor (men's divisions)
+
+For any two fighters, the UFC page gives each fighter's probability of winning in every round or by decision. The cells add up to 100%, and each row adds up to that fighter's overall chance of winning.
+
+**Data.** Fight results, round-by-round stats and fighter details come from the CSV files published by [Greco1899/scrape_ufc_stats](https://github.com/Greco1899/scrape_ufc_stats), which scrapes [ufcstats.com](http://ufcstats.com/) daily. `UFC/build_dataset.py` downloads them at a fixed commit and keeps men's fights: 7,945 since 1994. That repository is GPL-3.0; this project reads its published data files and doesn't copy its code.
+
+**Two models, multiplied together** (`UFC/MLModel_UFC.ipynb`):
+
+1. *Who wins* — CatBoost, calibrated with Platt scaling. Every fight is entered from both sides, because ufcstats.com lists the winner first in about 60% of bouts.
+2. *How it ends, given who wins* — logistic regression over round 1–5 or decision, using finishing rates, durability, pace, Elo, age, experience and the fight's context. Rounds a fight can't reach are zeroed.
+
+Every feature comes from the fighters' earlier fights only (`features/ufc.py`). The app builds a fighter's current form with the same function, adding a placeholder for their next fight, and the tests check that it matches the training data exactly.
+
+**Results on every men's fight since 1 January 2025** (802 fights; the models were trained on 2008–2024):
+
+| | Winner picked | Full-table log loss | Most likely outcome happened |
+|---|---|---|---|
+| Both models | 63.6% | 1.865 | 32.2% |
+| Winner model + historical round shares | 63.6% | 1.913 | 27.7% |
+| Elo + historical round shares | 55.0% | 1.942 | 24.1% |
+
+Lower log loss is better. Only 66 training fights ended in round 4 or 5, so those columns are the least reliable. They match reality on average, but individual 5-round predictions can look odd.
+
+**Refreshing.** Set `SOURCE_COMMIT` in `UFC/build_dataset.py` to that repository's latest commit, bump `VERSION`, run `python UFC/build_dataset.py`, rerun the notebook if retraining, and update the file names in `pages/UFC_page.py`.
+
+---
+
 ## Tech Stack
 
 - **Python** — data processing and modeling

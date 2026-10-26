@@ -5,7 +5,7 @@ import streamlit as st
 from pathlib import Path
 from pycaret.classification import load_model, predict_model
 
-from features.ligamx import build_current_state
+from features.ligamx import build_current_state, team_ids
 
 st.set_page_config(page_title="Liga MX Prediction Page", layout="centered")
 
@@ -20,12 +20,24 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Liga MX Clausura 2026")
+# The tournament being predicted; update both at the start of each tournament
+TORNEO, TEMPORADA = "Apertura", 2026
+
+# Clubs this tournament: Clausura 2026's eighteen, with Atlante in place of Mazatlan,
+# whose spot Atlante bought. Atlante has no Liga MX matches in the data (its last
+# top-flight season was 2013-14), so it starts from the values new teams get in training.
+TEAMS_THIS_SEASON = [
+    "America", "Atlante", "Atlas", "Atletico San Luis", "Cruz Azul", "FC Juarez",
+    "Guadalajara", "Leon", "Monterrey", "Necaxa", "Pachuca", "Puebla", "Pumas UNAM",
+    "Queretaro", "Santos Laguna", "Tigres UANL", "Tijuana", "Toluca",
+]
+
+st.title(f"Liga MX {TORNEO} {TEMPORADA}")
 
 Base_dir = Path(__file__).resolve().parent.parent / "LigaMX"
 
 # Paths to models, datset and model prediction results
-MODEL = Base_dir/"models"/"LigaMX_model_v3"
+MODEL = Base_dir/"models"/"LigaMX_model_v4"
 DATASET = Base_dir/"datasets"/"LigaMX_dataset_v6.csv"
 PREDICTIONS = Base_dir/"predictions"/"model_compareLMX.xlsx"
 
@@ -43,13 +55,15 @@ def load_data(path: str) -> pd.DataFrame:
 @st.cache_data
 def load_stats(path: str) -> dict:
     # Each dataset row holds a team's stats from before that match, so the last
-    # row is one match behind. Replay the history to include the latest match.
-    return build_current_state(pd.read_csv(path))
+    # row is one match behind. Replay the history to include the latest match;
+    # season points count only this tournament's games.
+    return build_current_state(pd.read_csv(path), season=(TEMPORADA, TORNEO))
 
 @st.cache_data
 def load_maps(path: str) -> dict:
     df = pd.read_csv(path)
-    team_map = dict(zip(df["Equipo"], df["TeamID"]))
+    # New clubs get the next free ID, so no existing team's ID changes
+    team_map = team_ids(df, TEAMS_THIS_SEASON)
     # Drop rows without a referee before pairing names with IDs, so the two stay aligned
     refs = df.dropna(subset=["Referee"])
     ref_map = dict(zip(refs["Referee"], refs["RefereeID"]))
@@ -82,26 +96,28 @@ def populate_feature_row(team_id, opponent_id, venue_id, ref_id, round_id, torne
         "TeamID"            : team_id,
         "RefereeID"         : ref_id,
         "RoundID"           : round_id,
-        "TemporadaID"       : 12,
+        "TemporadaID"       : temp_id,
         "TorneoID"          : torneo_id,
         "TimeID"            : time_id,
         "DayID"             : day_id,
+        # A club or pairing with no history gets what new teams got in training:
+        # Elo 1500, no season points, a 0 win rate and blanks (not zeros) for form and head-to-head
         "TeamElo"           : team_row.get("TeamElo", 1500.0),
         "OponentElo"        : opponent_row.get("TeamElo", 1500.0),
         "EloDiff"           : team_row.get("TeamElo", 1500) - opponent_row.get("TeamElo", 1500),
-        "TeamForm5"         : team_row.get("TeamForm5", 0),
+        "TeamForm5"         : team_row.get("TeamForm5", np.nan),
         "TeamWinRate5"      : team_row.get("TeamWinRate5", 0),
         "TeamSeasonPts"     : team_row.get("TeamSeasonPts", 0),
-        "TeamHomeForm5"     : team_row.get("TeamHomeForm5", 0),
-        "TeamAwayForm5"     : team_row.get("TeamAwayForm5", 0),
-        "OpponentForm5"     : opponent_row.get("TeamForm5", 0),
+        "TeamHomeForm5"     : team_row.get("TeamHomeForm5", np.nan),
+        "TeamAwayForm5"     : team_row.get("TeamAwayForm5", np.nan),
+        "OpponentForm5"     : opponent_row.get("TeamForm5", np.nan),
         "OpponentWinRate5"  : opponent_row.get("TeamWinRate5", 0),
         "OpponentSeasonPts" : opponent_row.get("TeamSeasonPts", 0),
-        "OpponentHomeForm5" : opponent_row.get("TeamHomeForm5", 0),
-        "OpponentAwayForm5" : opponent_row.get("TeamAwayForm5", 0),
-        "H2HWinRate"        : h2h_row.get("H2HWinRate", 0),
-        "H2HLast5"          : h2h_row.get("H2HLast5", 0),
-        "FormDiff"          : team_row.get("TeamForm5", 0) - opponent_row.get("TeamForm5", 0),
+        "OpponentHomeForm5" : opponent_row.get("TeamHomeForm5", np.nan),
+        "OpponentAwayForm5" : opponent_row.get("TeamAwayForm5", np.nan),
+        "H2HWinRate"        : h2h_row.get("H2HWinRate", np.nan),
+        "H2HLast5"          : h2h_row.get("H2HLast5", np.nan),
+        "FormDiff"          : team_row.get("TeamForm5", np.nan) - opponent_row.get("TeamForm5", np.nan),
         "SeasonPtsDiff"     : team_row.get("TeamSeasonPts", 0) - opponent_row.get("TeamSeasonPts", 0),
     }
 
@@ -116,7 +132,8 @@ except Exception as e:
     st.stop()
 
 
-TEAMS = sorted(df_data["Equipo"].dropna().unique().tolist())
+TEAMS = sorted(TEAMS_THIS_SEASON)
+LAST_MATCH = df_data["Date"].max()
 REFS = sorted(df_data["Referee"].dropna().unique().tolist())
 DAY_MAP = {"Mon":0, "Tue":1, "Wed":2, "Thu":3, "Fri":4, "Sat":5, "Sun":6}
 RESULT_MAP = {
@@ -169,12 +186,13 @@ JORNADA_ORDER = (
 
 # UI
 st.page_link("sportssystem_homepage.py", label="Back to Homepage")
-tab_sim, tab_result = st.tabs(["Macth Simulator", "Results"])
+tab_sim, tab_result = st.tabs(["Match Simulator", "Results"])
 
-# Tab 1 - Macth Simulator
+# Tab 1 - Match Simulator
 with tab_sim:
     st.subheader("Matches")
-    st.caption("Liga MX Clausura 2026")
+    st.caption(f"Liga MX {TORNEO} {TEMPORADA}. Results in the data run to {LAST_MATCH:%d %b %Y}; "
+               "matches played since then aren't counted yet.")
 
 
     col1, col2 = st.columns(2)
@@ -210,8 +228,9 @@ with tab_sim:
                 team_id = maps["team"].get(team,0)
                 opponent_id = maps["team"].get(opponent,0)
                 ref_id = maps["ref"].get(ref, 0)
-                torneo_id = maps["torneo"].get("Clausura", 0)
-                temporada_id = maps["temporada"].get(2026, 0)
+                torneo_id = maps["torneo"][TORNEO]
+                # A year not yet in the data gets the next code, as the metrics notebook would give it
+                temporada_id = maps["temporada"].get(TEMPORADA, max(maps["temporada"].values()) + 1)
                 time_id = time_id
                 day_id = day_id
                 round_id = round_id
@@ -244,6 +263,19 @@ with tab_sim:
                 with col_l:
                     st.metric("Loss", f"{l_prob:.2%}")
                     st.progress(float(l_prob))
+
+                new_clubs = [t for t in (team, opponent) if maps["team"][t] not in stats["team"]]
+                if new_clubs:
+                    st.info(f"{', '.join(new_clubs)} has no Liga MX matches in the data yet, so it starts "
+                            "from an Elo of 1500 with no form or head-to-head record.")
+
+                prediction = pd.DataFrame([{
+                    "Torneo": f"{TORNEO} {TEMPORADA}", "Jornada": jornada_label, "Team": team, "Opponent": opponent,
+                    "Venue": venue_label, "Referee": ref or "", "Predicted Result": f"{team} {predicted}",
+                    "Win": round(w_prob, 4), "Draw": round(d_prob, 4), "Loss": round(l_prob, 4),
+                }])
+                st.download_button("Download this prediction (CSV)", prediction.to_csv(index=False),
+                                   file_name=f"ligamx_{team}_vs_{opponent}.csv".replace(" ", "_"))
 
                 st.divider()
 

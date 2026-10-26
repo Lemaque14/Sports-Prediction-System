@@ -69,3 +69,28 @@ def test_state_before_a_matchday_matches_dataset(back):
         h2h = state["h2h"].get((int(r.TeamID), int(r.OpponentID)), {})
         for col in ["H2HWinRate", "H2HLast5"]:
             assert h2h.get(col, np.nan) == pytest.approx(r[col], nan_ok=True), col
+
+
+def test_new_season_state():
+    """A new tournament starts everyone at 0 season points; a new club gets the next free ID."""
+    raw = pd.read_csv(DATASET)
+    state = ligamx.build_current_state(raw, season=(2026, "Apertura"))
+    assert all(team["TeamSeasonPts"] == 0 for team in state["team"].values())
+    ids = ligamx.team_ids(raw, ["Atlante"])
+    assert ids["Atlante"] == max(raw["TeamID"].max(), raw["OpponentID"].max()) + 1
+    assert all(ids[name] == i for name, i in zip(raw["Equipo"], raw["TeamID"]))
+
+
+# Clausura 2020 was cancelled after matchday 10 (COVID-19), so it is incomplete by design
+CANCELLED = {(2020, "Clausura")}
+
+
+@pytest.mark.xfail(strict=True, reason="Apertura 2014 lacks 1 match; Apertura 2025 and Clausura 2026 lack about half. "
+                                       "Remove this marker once they are re-scraped.")
+def test_tournaments_are_complete():
+    raw = pd.read_csv(DATASET, parse_dates=["Date"])
+    # the latest tournament may still be in progress, so it isn't checked
+    latest = tuple(raw.sort_values("Date").iloc[-1][["Temporada", "Torneo"]])
+    gaps = ligamx.missing_matches(raw)
+    gaps = gaps[[(t, s) not in CANCELLED | {latest} for t, s in zip(gaps["Temporada"], gaps["Torneo"])]]
+    assert gaps.empty, gaps.to_string()

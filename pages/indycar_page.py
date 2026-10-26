@@ -187,7 +187,6 @@ def populate_feature_row(driver_name, track_info, is_postqualy, position_start, 
     track_id = track_info['id']
     type_id = track_info["type_id"]
     is_new = track_info["is_new"]
-    print(f"Looking up team_id: {team_id}, available: {list(TEAMS_MAP.keys())}")
     engine_id = TEAMS_MAP[team_id]["engine_id"]
 
     # Features baseline (Averages)
@@ -437,6 +436,14 @@ with tab_sim:
 
             display_df = results[["Position", "Driver", "Raw Score"]].set_index("Position")
             st.dataframe(display_df, use_container_width=True)
+
+            # Same columns as the Results sheet's model side, ready to paste
+            download = display_df.reset_index().rename(columns={"Position": "ModelRank", "Raw Score": "RawScore"})
+            download.insert(0, "Phase", mode)
+            download.insert(0, "Track", track_name_sim)
+            st.download_button("Download these predictions (CSV)", download.to_csv(index=False),
+                               file_name=f"indycar_{track_name_sim}_{mode}.csv".replace(" ", "_"),
+                               key="sim_download")
 
         except Exception as e:
             st.error(f"Simulation error: {e}")

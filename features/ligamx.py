@@ -79,24 +79,30 @@ def replay(df):
     return pre.sort_index(), dict(ratings), h2h
 
 
-def _form(rows):
-    """Form features a team carries into its next match (rows: its own, in order)."""
+def _form(rows, season=None):
+    """Form features a team carries into its next match (rows: its own, in order).
+
+    season: (Temporada, Torneo) of that match; season points count only its games,
+    so a new tournament starts at 0. Defaults to the team's latest tournament.
+    """
     last = rows.tail(WINDOW)
     home = last.loc[last["Venue"] == "Home", "Points"]
     away = last.loc[last["Venue"] == "Away", "Points"]
-    season = rows[(rows["Temporada"] == rows["Temporada"].iloc[-1]) & (rows["Torneo"] == rows["Torneo"].iloc[-1])]
+    temporada, torneo = season or (rows["Temporada"].iloc[-1], rows["Torneo"].iloc[-1])
+    season_rows = rows[(rows["Temporada"] == temporada) & (rows["Torneo"] == torneo)]
     return {
         "TeamForm5": last["Points"].sum(),
         "TeamWinRate5": (last["Result"] == "W").mean(),
-        "TeamSeasonPts": season["Points"].sum(),
+        "TeamSeasonPts": season_rows["Points"].sum(),
         "TeamHomeForm5": home.sum() if len(home) else np.nan,
         "TeamAwayForm5": away.sum() if len(away) else np.nan,
     }
 
 
-def build_current_state(df):
+def build_current_state(df, season=None):
     """Features as they stand after the latest match, keyed like the app's IDs.
 
+    season: (Temporada, Torneo) being predicted, e.g. (2026, "Apertura"); see _form.
     Returns {"team": {TeamID: {...}}, "h2h": {(TeamID, OpponentID): {...}}}.
     """
     df = prepare(df)
@@ -108,10 +114,39 @@ def build_current_state(df):
 
     team = {}
     for name, rows in df.groupby("Equipo", sort=False):
-        team[int(team_ids[name])] = {"TeamElo": ratings[name], **_form(rows)}
+        team[int(team_ids[name])] = {"TeamElo": ratings[name], **_form(rows, season)}
 
     pairs = {
         (int(team_ids[a]), int(opp_ids[b])): values
         for (a, b), values in h2h.items() if a in team_ids and b in opp_ids
     }
     return {"team": team, "h2h": pairs}
+
+
+def team_ids(df, new_teams=()):
+    """Team name -> ID, keeping the dataset's IDs and giving new teams the next free numbers."""
+    ids = {**dict(zip(df["Opponent"], df["OpponentID"])), **dict(zip(df["Equipo"], df["TeamID"]))}
+    ids = {name: int(i) for name, i in ids.items()}
+    for name in new_teams:
+        if name not in ids:
+            ids[name] = max(ids.values()) + 1
+    return ids
+
+
+def missing_matches(df):
+    """Regular-season matches each team should have but the data lacks, per tournament.
+
+    In a full tournament every team meets every other once. A tournament still in
+    progress shows as incomplete too, so read the result with that in mind.
+    """
+    df = prepare(df)
+    regular = df[df["Round"].str.startswith("Jornada")].drop_duplicates("match_id")
+    rows = []
+    for (temporada, torneo), games in regular.groupby(["Temporada", "Torneo"]):
+        played = pd.concat([games["Equipo"], games["Opponent"]]).value_counts()
+        expected = len(played) - 1
+        rows.append({"Temporada": temporada, "Torneo": torneo, "Teams": len(played),
+                     "Matches": len(games), "Expected": len(played) * expected // 2,
+                     "TeamsShort": int((played < expected).sum())})
+    out = pd.DataFrame(rows)
+    return out[out["Matches"] < out["Expected"]].reset_index(drop=True)

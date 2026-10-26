@@ -70,7 +70,7 @@ Widget keys:
 - Liga MX: `team_selected`, `opp_selected`, `ref_selected`, `ligamx_predict`
 - UFC: `ufc_a`, `ufc_b`, `ufc_class`, `ufc_rounds`, `ufc_title`, `ufc_predict`
 
-**CI** (`.github/workflows/python-app-test-sps.yml`) runs on PRs into `main` with Python 3.10. It checks for syntax errors and undefined names with flake8, then runs `pytest`. Exit code 5 means pytest found no tests, which is what `main` gives until `tests/` is merged.
+**CI** (`.github/workflows/python-app-test-sps.yml`) runs on PRs into `main` with Python 3.10. It checks for syntax errors and undefined names with flake8, then runs `pytest`. Exit code 5 means pytest found no tests (CI failed that way on `main` before `tests/` was merged).
 
 ### Environment gotchas
 
@@ -100,12 +100,16 @@ Widget keys:
 2. Run `LigaMX/datasets/LigaMX_metrics.ipynb` with the previous dataset (`PREVIOUS_DATASET`) uploaded next to it, so IDs carry over. The last cell writes `OUTPUT_DATASET` in v6's exact format.
 
    Training uses every column it doesn't drop as a feature, so extra columns would break the app. Run on v6's raw columns, the notebook reproduces v6 exactly.
-3. Retrain with `LigaMX/MLModel_LigaMX.ipynb`.
+3. Retrain with the "v4" section at the end of `LigaMX/MLModel_LigaMX.ipynb`. It checks the models tournament by tournament (train on everything before each of the last six tournaments, predict that tournament), then refits logistic regression on every match.
+
+   On v6, logistic regression beat random forest, LightGBM, CatBoost and the old blend (51.4% accuracy, log loss 1.006, against the home/away baseline's 47.0% and 1.059). The cells above that section are the owner's earlier exploration on the leaky v5 data.
 4. In `pages/LigaMX_page.py`, update:
    - `DATASET` and `MODEL`;
    - at the start of each tournament, `TORNEO, TEMPORADA` and `TEAMS_THIS_SEASON` (promoted, relegated and franchise-swapped clubs).
 
    A club with no history gets the next free ID and starts at Elo 1500. `Temporada` is the calendar year: Apertura 2026 is played July to December 2026.
+
+   Apertura 2026 has 18 clubs (Atlante in place of Mazatlán). Press reports say the play-in was dropped and the regular season is 17 matchdays.
 5. `features.ligamx.missing_matches(df)` lists tournaments with fewer regular-season matches than a full round robin. Clausura 2020 is short by design: it was cancelled for COVID-19.
 
 ### UFC
@@ -117,19 +121,24 @@ Widget keys:
 
 ## Open work (as of Oct 2026)
 
-**Pull requests, in merge order:**
-1. [#2](https://github.com/Lemaque14/Sports-Prediction-System/pull/2): leakage fixes, stale app features, rookies, `features/` and tests. Merge first.
-2. [#3](https://github.com/Lemaque14/Sports-Prediction-System/pull/3): IndyCar generator and scraper fixes. Independent of #2. Its CI fails only because `main` has no tests yet; re-run it after #2.
-3. [#4](https://github.com/Lemaque14/Sports-Prediction-System/pull/4): UFC page. Stacked on #2.
-4. [#5](https://github.com/Lemaque14/Sports-Prediction-System/pull/5): Liga MX Apertura 2026 (Atlante) and prediction downloads. Stacked on #2.
+**Merged on 26 Oct 2026:**
 
-After #2 merges, GitHub retargets #4 and #5 to `main`.
+| PR | What it did |
+|---|---|
+| [#2](https://github.com/Lemaque14/Sports-Prediction-System/pull/2) | Leakage fixes, stale app features, rookies; added `features/` and `tests/` |
+| [#3](https://github.com/Lemaque14/Sports-Prediction-System/pull/3) | IndyCar generator and scraper fixes |
+| [#4](https://github.com/Lemaque14/Sports-Prediction-System/pull/4) | UFC page |
+| [#5](https://github.com/Lemaque14/Sports-Prediction-System/pull/5) | Liga MX for Apertura 2026 (Atlante), Liga MX model v4, prediction downloads |
+| [#6](https://github.com/Lemaque14/Sports-Prediction-System/pull/6) | This file |
 
-**Data fixes the owner needs to make:**
-- **IndyCar results file**
-  - 2014 Indy 500 (EventID 2988): 4 rows have TrackID 24; they should be 4.
-  - Santino Ferrucci's 2026 races from 31 May to 23 Aug were typed with Katherine Legge's DriverID 4401; his is 4897.
-  - Road America 2025 was typed with Thermal's EventID 6463. It is excluded (`EXCLUDED_RACES`) until its real EventID is confirmed.
-- **IndyCar scraper:** run the one-time folder migration (`DRY_RUN = True` first), then generate v26 and retrain.
-- **Liga MX re-scrape:** Apertura 2025 has 75 of 153 regular-season matches and Clausura 2026 has 96; Apertura 2014 is 1 short. Re-scrape them and add Apertura 2026. Then remove the `xfail` marker on `test_tournaments_are_complete` and retrain.
-- **Liga MX club list:** confirm `TEAMS_THIS_SEASON` for Apertura 2026. Only Atlante replacing Mazatlán has been checked.
+**Still to do, all in the owner's Colab and Google Drive** (this environment can't reach FBref, imscdn.com or Drive):
+- **IndyCar**
+  - Run the scraper's one-time folder migration (`DRY_RUN = True` first).
+  - Generate v26, point `pages/indycar_page.py` at it and retrain. The current IndyCar models were trained on the leaky v25 features.
+  - The generator corrects the two known typing errors in v25 itself: the 2014 Indy 500 TrackIDs (24 → 4) and Santino Ferrucci's 2026 DriverID (Katherine Legge's 4401 → 4897). Type Ferrucci as 4897 from now on.
+  - Road America 2025 was typed with Thermal's EventID 6463. It stays excluded (`EXCLUDED_RACES`) until its real EventID is confirmed.
+- **Liga MX**
+  - Re-scrape Apertura 2025 (75 of 153 regular-season matches in v6), Clausura 2026 (96 of 153; the data stops at 26 Apr 2026) and Apertura 2014 (1 short).
+  - Add Apertura 2026, which was at matchday 14 on 26 Oct 2026. Until then the page predicts as if the tournament had just started.
+  - Then build v7, retrain, and remove the `xfail` marker on `test_tournaments_are_complete`.
+- **Secrets:** move the ScraperAPI key into Colab Secrets before the Liga MX scraper notebook is added to this repo.
